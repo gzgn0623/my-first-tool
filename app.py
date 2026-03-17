@@ -561,18 +561,20 @@ def fetch_1999_product(jan_code: str, session: requests.Session) -> dict:
         result["情報元URL"] = resp.url  # リダイレクト後の実際のURL
         soup = BeautifulSoup(resp.text, "lxml")
 
-        # 商品名
-        title_elem = soup.find("h1", class_="title")
+        # 商品名: 正しいクラス名は c-product-detail__info-title
+        title_elem = soup.find("h1", class_="c-product-detail__info-title")
         if not title_elem:
+            # フォールバック: titleタグ
             title_elem = soup.find("title")
         if title_elem:
             raw_title = title_elem.get_text(strip=True)
-            # 「商品名 - ホビーサーチ」のような形式から商品名だけ取り出す
+            # 「商品名 - ホビーサーチ ミニ四駆他」のような形式から商品名だけ取り出す
             result["商品名"] = re.split(r"[\|\-]", raw_title)[0].strip()
 
         # ページ全文から「●パッケージサイズ/重さ」を正規表現で抽出
         # 形式: 「●パッケージサイズ/重さ : 12.2 x 8.4 x 1 cm / 28g」
-        page_text = soup.get_text(separator="\n")
+        # ※レスポンスに \r\n が含まれるため、\n に正規化してからマッチ
+        page_text = soup.get_text(separator="\n").replace("\r\n", "\n").replace("\r", "\n")
         size_weight_match = re.search(
             r"パッケージサイズ[/／]重[さ量][^:：]*[:：]\s*([\d.]+\s*[xX×]\s*[\d.]+\s*[xX×]\s*[\d.]+\s*cm)\s*[/／]\s*([\d.]+\s*[gGkK]+)",
             page_text,
