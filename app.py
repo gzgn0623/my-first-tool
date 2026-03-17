@@ -662,10 +662,15 @@ def fetch_product_data(jan_code: str, maker: str, session: requests.Session) -> 
     record["重量(数値)"] = extract_weight(record.get("重量(元データ)"))
     record["体積(cm³)"] = calculate_volume(record.get("サイズ(元データ)"))
 
-    if record["商品名"] != UNAVAILABLE:
-        record["ステータス"] = "✅ 取得成功"
+    size_missing = record.get("サイズ(元データ)") == UNAVAILABLE
+    weight_missing = record.get("重量(元データ)") in [UNAVAILABLE, "-"]
+
+    if record["商品名"] == UNAVAILABLE:
+        record["ステータス"] = "❌ 商品が見つかりません"
+    elif size_missing and weight_missing:
+        record["ステータス"] = "⚠️ サイズ・重量取得不可"
     else:
-        record["ステータス"] = "⚠️ 一部取得不可"
+        record["ステータス"] = "✅ 取得成功"
 
     return record
 
