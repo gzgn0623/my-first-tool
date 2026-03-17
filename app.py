@@ -535,8 +535,9 @@ def fetch_takaratomy_product(jan_code: str, _session: requests.Session) -> dict:
         return result
 
 
-def fetch_1999_product(jan_code: str, session: requests.Session) -> dict:
+def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
     """その他おもちゃ: 1999.co.jp からJANコードで検索し商品情報を取得する"""
+    from curl_cffi import requests as cffi_requests
     jan_str = jan_code.strip()
     search_url = (
         f"https://www.1999.co.jp/search?typ1_c=101&cat=&target=JanCode&searchkey={jan_str}"
@@ -549,12 +550,7 @@ def fetch_1999_product(jan_code: str, session: requests.Session) -> dict:
         "情報元URL": search_url,
     }
     try:
-        resp = session.get(
-            search_url,
-            headers=DEFAULT_HEADERS,
-            allow_redirects=True,
-            timeout=20,
-        )
+        resp = cffi_requests.get(search_url, impersonate="chrome110", timeout=20, allow_redirects=True)
         if resp.status_code != 200:
             return result
 
