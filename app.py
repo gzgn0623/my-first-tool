@@ -577,8 +577,10 @@ def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
             raw_title = title_elem.get_text(strip=True)
             result["商品名"] = re.split(r"[\|\-]", raw_title)[0].strip()
 
-        # ページ全文から「●パッケージサイズ/重さ」を正規表現で抽出
+        # ページ全文から「●パッケージサイズ/重さ」等を正規表現で抽出
         page_text = soup.get_text(separator="\n").replace("\r\n", "\n").replace("\r", "\n")
+        
+        # 1. 両方記載パターン 「●パッケージサイズ/重さ : 12.2 x 8.4 x 1 cm / 28g」
         size_weight_match = re.search(
             r"パッケージサイズ[/／]重[さ量][^:：]*[:：]\s*([\d.]+\s*[xX×]\s*[\d.]+\s*[xX×]\s*[\d.]+\s*cm)\s*[/／]\s*([\d.]+\s*[gGkK]+)",
             page_text,
@@ -588,12 +590,21 @@ def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
             result["サイズ(元データ)"] = size_weight_match.group(1).strip()
             result["重量(元データ)"] = size_weight_match.group(2).strip()
         else:
+            # 2. サイズのみ記載パターン
             size_only = re.search(
                 r"パッケージサイズ[^:：]*[:：]\s*([\d.]+\s*[xX×]\s*[\d.]+\s*[xX×]\s*[\d.]+\s*cm)",
                 page_text, re.IGNORECASE
             )
             if size_only:
                 result["サイズ(元データ)"] = size_only.group(1).strip()
+
+            # 3. 重量のみ記載パターン 「●重さ : 50g」など
+            weight_only = re.search(
+                r"重[さ量][^:：]*[:：]\s*([\d.]+\s*[gGkK]+)",
+                page_text, re.IGNORECASE
+            )
+            if weight_only:
+                result["重量(元データ)"] = weight_only.group(1).strip()
 
         return result
     except HTTPError as e:
