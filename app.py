@@ -537,7 +537,9 @@ def fetch_takaratomy_product(jan_code: str, _session: requests.Session) -> dict:
 
 def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
     """その他おもちゃ: 1999.co.jp からJANコードで検索し商品情報を取得する"""
-    from curl_cffi import requests as cffi_requests
+    import urllib.request
+    from urllib.error import HTTPError, URLError
+
     jan_str = jan_code.strip()
     search_url = (
         f"https://www.1999.co.jp/search?typ1_c=101&cat=&target=JanCode&searchkey={jan_str}"
@@ -550,26 +552,32 @@ def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
         "情報元URL": search_url,
     }
     try:
-        resp = cffi_requests.get(search_url, impersonate="chrome110", timeout=20, allow_redirects=True)
-        if resp.status_code != 200:
-            return result
-
-        result["情報元URL"] = resp.url  # リダイレクト後の実際のURL
-        soup = BeautifulSoup(resp.text, "lxml")
+        req = urllib.request.Request(
+            search_url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "ja",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            html = response.read().decode("utf-8", errors="ignore")
+            result["情報元URL"] = response.geturl()  # リダイレクト後の実際のURL
+            
+        soup = BeautifulSoup(html, "lxml")
 
         # 商品名: 正しいクラス名は c-product-detail__info-title
         title_elem = soup.find("h1", class_="c-product-detail__info-title")
         if not title_elem:
-            # フォールバック: titleタグ
             title_elem = soup.find("title")
         if title_elem:
             raw_title = title_elem.get_text(strip=True)
-            # 「商品名 - ホビーサーチ ミニ四駆他」のような形式から商品名だけ取り出す
             result["商品名"] = re.split(r"[\|\-]", raw_title)[0].strip()
 
         # ページ全文から「●パッケージサイズ/重さ」を正規表現で抽出
-        # 形式: 「●パッケージサイズ/重さ : 12.2 x 8.4 x 1 cm / 28g」
-        # ※レスポンスに \r\n が含まれるため、\n に正規化してからマッチ
         page_text = soup.get_text(separator="\n").replace("\r\n", "\n").replace("\r", "\n")
         size_weight_match = re.search(
             r"パッケージサイズ[/／]重[さ量][^:：]*[:：]\s*([\d.]+\s*[xX×]\s*[\d.]+\s*[xX×]\s*[\d.]+\s*cm)\s*[/／]\s*([\d.]+\s*[gGkK]+)",
@@ -580,7 +588,6 @@ def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
             result["サイズ(元データ)"] = size_weight_match.group(1).strip()
             result["重量(元データ)"] = size_weight_match.group(2).strip()
         else:
-            # フォールバック: サイズのみ or 重量のみマッチ
             size_only = re.search(
                 r"パッケージサイズ[^:：]*[:：]\s*([\d.]+\s*[xX×]\s*[\d.]+\s*[xX×]\s*[\d.]+\s*cm)",
                 page_text, re.IGNORECASE
@@ -588,6 +595,15 @@ def fetch_1999_product(jan_code: str, _session: requests.Session) -> dict:
             if size_only:
                 result["サイズ(元データ)"] = size_only.group(1).strip()
 
+        return result
+    except HTTPError as e:
+        print(f"HTTPError fetching 1999.co.jp for {jan_code}: {e.code}")
+        # UIにエラー原因を表示させるため商品名に代入
+        result["商品名"] = f"エラー: {e.code} (アクセス拒否)"
+        return result
+    except URLError as e:
+        print(f"URLError fetching 1999.co.jp for {jan_code}: {e.reason}")
+        result["商品名"] = f"エラー: 接続失敗"
         return result
     except Exception as e:
         print(f"Error fetching 1999.co.jp for {jan_code}: {e}")
