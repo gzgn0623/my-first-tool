@@ -353,21 +353,21 @@ def calculate_volume(size_str: str) -> float | str:
         vol = (radius_cm ** 2) * math.pi * length_cm
         return round(vol, 1)
 
-    # パターンB（直方体 - PILOT/タカラトミー共通）: "185×50×15mm" または "W225×H165×D97mm" または "82㎜×86㎜×36㎜"
-    match_b = re.search(r"(?:W\s*)?(\d+(?:\.\d+)?)[a-zA-Z㎜㎝]*\s*[×x*]\s*(?:H\s*)?(\d+(?:\.\d+)?)[a-zA-Z㎜㎝]*\s*[×x*]\s*(?:D\s*)?(\d+(?:\.\d+)?)", size_str, re.IGNORECASE)
-    if match_b:
-        l = float(match_b.group(1)) / 10
-        w = float(match_b.group(2)) / 10
-        h = float(match_b.group(3)) / 10
-        vol = l * w * h
-        return round(vol, 1)
-
-    # パターンC（1999.co.jp用）: "12.2 x 8.4 x 1 cm" または "12.2x8.4x1cm"
-    match_c = re.search(r"(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*cm", size_str, re.IGNORECASE)
+    # パターンC（1999.co.jp等の cm 記述）を先に判定する（mmと誤認されるのを防ぐため）
+    match_c = re.search(r"(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:cm|㎝)", size_str, re.IGNORECASE)
     if match_c:
         l = float(match_c.group(1))
         w = float(match_c.group(2))
         h = float(match_c.group(3))
+        vol = l * w * h
+        return round(vol, 1)
+
+    # パターンB（直方体 - PILOT/タカラトミー等の mm 記述）: "185×50×15mm" または "W225×H165×D97" または "82㎜×86㎜×36㎜"
+    match_b = re.search(r"(?:W\s*)?(\d+(?:\.\d+)?)(?:mm|㎜)?\s*[×x*]\s*(?:H\s*)?(\d+(?:\.\d+)?)(?:mm|㎜)?\s*[×x*]\s*(?:D\s*)?(\d+(?:\.\d+)?)(?:mm|㎜)?", size_str, re.IGNORECASE)
+    if match_b:
+        l = float(match_b.group(1)) / 10
+        w = float(match_b.group(2)) / 10
+        h = float(match_b.group(3)) / 10
         vol = l * w * h
         return round(vol, 1)
 
